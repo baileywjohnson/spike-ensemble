@@ -47,27 +47,6 @@ html, body { height: 100%; background: #0a0a0f; overflow: hidden; }
 #audio-prompt { font-size: 16px; color: #e0e0e0; letter-spacing: 1px; }
 #audio-sub { font-size: 11px; color: #666; margin-top: 8px; letter-spacing: 2px; text-transform: uppercase; }
 
-/* GitHub link */
-#github-link {
-  position: absolute;
-  top: 16px;
-  right: 120px;
-  z-index: 50;
-  font-size: 11px;
-  padding: 4px 10px;
-  border-radius: 4px;
-  background: #1a1a2e;
-  border: 1px solid #2a2a4a;
-  color: #888;
-  text-decoration: none;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  transition: color 0.2s, border-color 0.2s;
-}
-#github-link:hover { color: #e0e0e0; border-color: #4a4a6a; }
-#github-link svg { fill: currentColor; }
-
 /* Connection status */
 #connection-status {
   position: absolute;
@@ -232,8 +211,19 @@ html, body { height: 100%; background: #0a0a0f; overflow: hidden; }
 #sim-status {
   font-size: 11px;
   letter-spacing: 1px;
-  margin-left: auto;
 }
+#github-link {
+  margin-left: auto;
+  color: #555;
+  text-decoration: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  transition: color 0.2s;
+}
+#github-link:hover { color: #e0e0e0; }
+#github-link svg { fill: currentColor; }
 #sim-status.stopped { color: #666; }
 #sim-status.running { color: #64ffda; }
 #sim-status.starting { color: #ffaa00; }
@@ -249,10 +239,6 @@ html, body { height: 100%; background: #0a0a0f; overflow: hidden; }
     </div>
   </div>
 
-  <a id="github-link" href="https://github.com/baileywjohnson/spike-ensemble" target="_blank" rel="noopener">
-    <svg width="14" height="14" viewBox="0 0 16 16"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
-    GitHub
-  </a>
   <div id="connection-status" class="disconnected">idle</div>
 
   <div id="control-bar">
@@ -262,6 +248,10 @@ html, body { height: 100%; background: #0a0a0f; overflow: hidden; }
     <label>Duration <input type="number" id="param-duration" value="120" min="10" max="3600"></label>
     <label>Threshold <input type="number" id="param-threshold" value="1" min="1" max="10"></label>
     <span id="sim-status" class="stopped">STOPPED</span>
+    <a id="github-link" href="https://github.com/baileywjohnson/spike-ensemble" target="_blank" rel="noopener">
+      <svg width="14" height="14" viewBox="0 0 16 16"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+      GitHub
+    </a>
   </div>
 
   <div id="phase-banner">
