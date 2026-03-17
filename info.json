@@ -1,0 +1,7 @@
+{
+  "name": "spike-ensemble",
+  "version": "0.1.0",
+  "description": "Living neurons that jam — a closed-loop system where biological neurons produce real-time generative music",
+  "author": "Bailey Johnson",
+  "config_version": 1
+}

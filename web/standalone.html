@@ -1,0 +1,976 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Spike Ensemble — Living Neurons That Jam</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { height: 100%; background: #0a0a0f; overflow: hidden; }
+
+#app {
+  position: relative;
+  font-family: 'JetBrains Mono', 'SF Mono', 'Fira Code', monospace;
+  background: #0a0a0f;
+  color: #e0e0e0;
+  padding: 12px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* Audio Overlay */
+#audio-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 100;
+  background: rgba(10, 10, 15, 0.95);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: opacity 0.4s;
+}
+#audio-overlay.hidden { opacity: 0; pointer-events: none; }
+#audio-overlay-content { text-align: center; }
+#audio-icon {
+  font-size: 64px;
+  color: #64ffda;
+  margin-bottom: 16px;
+  animation: pulse 2s ease-in-out infinite;
+}
+@keyframes pulse {
+  0%, 100% { opacity: 0.6; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.1); }
+}
+#audio-prompt { font-size: 16px; color: #e0e0e0; letter-spacing: 1px; }
+#audio-sub { font-size: 11px; color: #666; margin-top: 8px; letter-spacing: 2px; text-transform: uppercase; }
+
+/* Connection status */
+#connection-status {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  z-index: 50;
+  font-size: 11px;
+  padding: 4px 10px;
+  border-radius: 4px;
+  background: #1a1a2e;
+  border: 1px solid #2a2a4a;
+}
+#connection-status.connected { color: #64ffda; border-color: #2a4a3a; }
+#connection-status.disconnected { color: #ff4444; border-color: #4a2a2a; }
+
+/* Phase Banner */
+#phase-banner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 16px;
+  background: linear-gradient(90deg, #1a1a2e, #16213e);
+  border: 1px solid #2a2a4a;
+  border-radius: 6px;
+}
+#phase-label {
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: #64ffda;
+  text-shadow: 0 0 10px rgba(100, 255, 218, 0.4);
+}
+#phase-timer { font-size: 14px; color: #888; }
+#mute-btn {
+  background: none;
+  border: 1px solid #2a2a4a;
+  border-radius: 4px;
+  color: #64ffda;
+  font-size: 16px;
+  padding: 2px 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+#mute-btn:hover { background: rgba(100, 255, 218, 0.1); }
+#mute-btn.muted { color: #555; border-color: #1a1a2a; }
+
+/* Main Panels */
+#main-panels { display: flex; gap: 12px; flex: 1; min-height: 0; }
+#main-panels > div {
+  background: #111118;
+  border: 1px solid #2a2a3a;
+  border-radius: 6px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+}
+#main-panels h3 {
+  margin: 0 0 8px 0;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  color: #666;
+}
+
+/* MEA Panel */
+#mea-panel { flex: 0 0 340px; align-items: center; }
+#mea-canvas { border: 1px solid #222; border-radius: 4px; }
+#mea-legend { display: flex; gap: 16px; margin-top: 8px; font-size: 11px; }
+.legend-stim { color: #4488ff; }
+.legend-spike { color: #ff8844; }
+
+/* Piano Panel */
+#piano-panel { flex: 1; }
+#piano-canvas { flex: 1; border: 1px solid #222; border-radius: 4px; }
+#chord-display { display: flex; justify-content: space-between; align-items: center; margin-top: 8px; }
+#chord-label { font-size: 20px; font-weight: 700; color: #bb86fc; }
+#beat-indicator { display: flex; gap: 4px; }
+.beat-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: #333;
+  transition: background 0.05s;
+}
+.beat-dot.active { background: #64ffda; box-shadow: 0 0 6px rgba(100, 255, 218, 0.6); }
+.beat-dot.downbeat { width: 10px; height: 10px; }
+
+/* Stats Panel */
+#stats-panel { flex: 0 0 260px; }
+.stat-row { display: flex; justify-content: space-between; padding: 4px 0; font-size: 12px; }
+.stat-label { color: #888; }
+.stat-value { color: #e0e0e0; font-weight: 600; }
+#coherence-bar-container { height: 6px; background: #222; border-radius: 3px; margin: 4px 0 8px; overflow: hidden; }
+#coherence-bar { height: 100%; width: 50%; background: linear-gradient(90deg, #ff4444, #ffaa00, #44ff88); border-radius: 3px; transition: width 0.2s; }
+#coherence-graph { margin-top: auto; border: 1px solid #222; border-radius: 4px; width: 100%; }
+
+/* Phase colors */
+.phase-listening #phase-label { color: #888; }
+.phase-first_notes #phase-label { color: #ff8844; }
+.phase-learning #phase-label { color: #ffaa00; }
+.phase-jamming #phase-label { color: #64ffda; }
+.phase-challenge #phase-label { color: #bb86fc; }
+
+/* Control Bar */
+#control-bar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 8px 16px;
+  background: #111118;
+  border: 1px solid #2a2a3a;
+  border-radius: 6px;
+  position: relative;
+  z-index: 200;
+}
+#control-bar label {
+  font-size: 11px;
+  color: #888;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+#control-bar input[type="number"] {
+  width: 60px;
+  background: #1a1a2e;
+  border: 1px solid #2a2a4a;
+  border-radius: 4px;
+  color: #e0e0e0;
+  font-family: inherit;
+  font-size: 12px;
+  padding: 4px 6px;
+  text-align: center;
+}
+#control-bar input:disabled { opacity: 0.4; }
+.ctrl-btn {
+  padding: 6px 16px;
+  border: 1px solid #2a2a4a;
+  border-radius: 4px;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-transform: uppercase;
+}
+.ctrl-btn:disabled { opacity: 0.3; cursor: default; }
+#start-btn {
+  background: rgba(100, 255, 218, 0.1);
+  color: #64ffda;
+  border-color: #2a4a3a;
+}
+#start-btn:hover:not(:disabled) { background: rgba(100, 255, 218, 0.25); }
+#stop-btn {
+  background: rgba(255, 68, 68, 0.1);
+  color: #ff4444;
+  border-color: #4a2a2a;
+}
+#stop-btn:hover:not(:disabled) { background: rgba(255, 68, 68, 0.25); }
+#sim-status {
+  font-size: 11px;
+  letter-spacing: 1px;
+  margin-left: auto;
+}
+#sim-status.stopped { color: #666; }
+#sim-status.running { color: #64ffda; }
+#sim-status.starting { color: #ffaa00; }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="audio-overlay">
+    <div id="audio-overlay-content">
+      <div id="audio-icon">&#9835;</div>
+      <div id="audio-prompt">Click anywhere to enable audio</div>
+      <div id="audio-sub">Spike Ensemble — Living Neurons That Jam</div>
+    </div>
+  </div>
+
+  <div id="connection-status" class="disconnected">idle</div>
+
+  <div id="control-bar">
+    <button id="start-btn" class="ctrl-btn">Start</button>
+    <button id="stop-btn" class="ctrl-btn" disabled>Stop</button>
+    <label>BPM <input type="number" id="param-bpm" value="120" min="40" max="300"></label>
+    <label>Duration <input type="number" id="param-duration" value="120" min="10" max="3600"></label>
+    <label>Threshold <input type="number" id="param-threshold" value="1" min="1" max="10"></label>
+    <span id="sim-status" class="stopped">STOPPED</span>
+  </div>
+
+  <div id="phase-banner">
+    <span id="phase-label"></span>
+    <span id="phase-timer"></span>
+    <button id="mute-btn" title="Toggle audio">&#9834;</button>
+  </div>
+
+  <div id="main-panels">
+    <div id="mea-panel">
+      <h3>MEA Activity</h3>
+      <canvas id="mea-canvas" width="320" height="320"></canvas>
+      <div id="mea-legend">
+        <span class="legend-stim">&#9632; Stimulation</span>
+        <span class="legend-spike">&#9632; Spikes</span>
+      </div>
+    </div>
+
+    <div id="piano-panel">
+      <h3>Neural Output</h3>
+      <canvas id="piano-canvas" width="480" height="280"></canvas>
+      <div id="chord-display">
+        <span id="chord-label">Cmaj</span>
+        <span id="beat-indicator"></span>
+      </div>
+    </div>
+
+    <div id="stats-panel">
+      <h3>Performance</h3>
+      <div class="stat-row"><span class="stat-label">Coherence</span><span id="coherence-value" class="stat-value">0.500</span></div>
+      <div id="coherence-bar-container"><div id="coherence-bar"></div></div>
+      <div class="stat-row"><span class="stat-label">Trend</span><span id="trend-value" class="stat-value">+0.0000</span></div>
+      <div class="stat-row"><span class="stat-label">Notes Played</span><span id="notes-total" class="stat-value">0</span></div>
+      <div class="stat-row"><span class="stat-label">Velocity</span><span id="velocity-value" class="stat-value">0</span></div>
+      <canvas id="coherence-graph" width="240" height="120"></canvas>
+    </div>
+  </div>
+</div>
+
+<!-- Minimal msgpack decoder (browser-compatible) -->
+<script>
+var msgpack = { decode: function(buffer) {
+  const view = new DataView(buffer instanceof ArrayBuffer ? buffer : buffer.buffer, buffer.byteOffset || 0, buffer.byteLength || buffer.length);
+  const bytes = new Uint8Array(view.buffer, view.byteOffset, view.byteLength);
+  let offset = 0;
+
+  function read() {
+    const b = bytes[offset++];
+    // positive fixint (0x00-0x7f)
+    if (b <= 0x7f) return b;
+    // negative fixint (0xe0-0xff)
+    if (b >= 0xe0) return b - 256;
+    // fixmap (0x80-0x8f)
+    if (b >= 0x80 && b <= 0x8f) return readMap(b & 0x0f);
+    // fixarray (0x90-0x9f)
+    if (b >= 0x90 && b <= 0x9f) return readArray(b & 0x0f);
+    // fixstr (0xa0-0xbf)
+    if (b >= 0xa0 && b <= 0xbf) return readStr(b & 0x1f);
+    switch (b) {
+      case 0xc0: return null;
+      case 0xc2: return false;
+      case 0xc3: return true;
+      case 0xca: { const v = view.getFloat32(offset); offset += 4; return v; }
+      case 0xcb: { const v = view.getFloat64(offset); offset += 8; return v; }
+      case 0xcc: return bytes[offset++];
+      case 0xcd: { const v = view.getUint16(offset); offset += 2; return v; }
+      case 0xce: { const v = view.getUint32(offset); offset += 4; return v; }
+      case 0xcf: { const v = Number(view.getBigUint64(offset)); offset += 8; return v; }
+      case 0xd0: { const v = view.getInt8(offset); offset += 1; return v; }
+      case 0xd1: { const v = view.getInt16(offset); offset += 2; return v; }
+      case 0xd2: { const v = view.getInt32(offset); offset += 4; return v; }
+      case 0xd3: { const v = Number(view.getBigInt64(offset)); offset += 8; return v; }
+      case 0xd9: { const len = bytes[offset++]; return readStr(len); }
+      case 0xda: { const len = view.getUint16(offset); offset += 2; return readStr(len); }
+      case 0xdb: { const len = view.getUint32(offset); offset += 4; return readStr(len); }
+      case 0xdc: { const len = view.getUint16(offset); offset += 2; return readArray(len); }
+      case 0xdd: { const len = view.getUint32(offset); offset += 4; return readArray(len); }
+      case 0xde: { const len = view.getUint16(offset); offset += 2; return readMap(len); }
+      case 0xdf: { const len = view.getUint32(offset); offset += 4; return readMap(len); }
+      // bin8/16/32 - skip
+      case 0xc4: { const len = bytes[offset++]; offset += len; return null; }
+      case 0xc5: { const len = view.getUint16(offset); offset += 2 + len; return null; }
+      case 0xc6: { const len = view.getUint32(offset); offset += 4 + len; return null; }
+      // ext - skip
+      case 0xd4: offset += 2; return null;
+      case 0xd5: offset += 3; return null;
+      case 0xd6: offset += 5; return null;
+      case 0xd7: offset += 9; return null;
+      case 0xd8: offset += 17; return null;
+      case 0xc7: { const len = bytes[offset++]; offset += 1 + len; return null; }
+      case 0xc8: { const len = view.getUint16(offset); offset += 3 + len; return null; }
+      case 0xc9: { const len = view.getUint32(offset); offset += 5 + len; return null; }
+      default: throw new Error('Unknown msgpack type: 0x' + b.toString(16));
+    }
+  }
+
+  function readStr(len) {
+    const strBytes = bytes.subarray(offset, offset + len);
+    offset += len;
+    // TextDecoder is available in all modern browsers
+    return new TextDecoder().decode(strBytes);
+  }
+
+  function readArray(len) {
+    const arr = new Array(len);
+    for (let i = 0; i < len; i++) arr[i] = read();
+    return arr;
+  }
+
+  function readMap(len) {
+    const obj = {};
+    for (let i = 0; i < len; i++) { const k = read(); obj[k] = read(); }
+    return obj;
+  }
+
+  return read();
+}};
+</script>
+
+<script>
+// ── Configuration ──
+const urlParams = new URLSearchParams(window.location.search);
+const WS_PORT = urlParams.get('port') || 1025;
+const WS_HOST = urlParams.get('host') || window.location.hostname || '127.0.0.1';
+const SERVER_URL = urlParams.get('server'); // e.g. ?server=http://localhost:8080
+const isLocalhost = ['localhost', '127.0.0.1', ''].includes(window.location.hostname);
+let demoMode = urlParams.has('demo') || (!SERVER_URL && !isLocalhost);
+
+const PITCH_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+const GRID_SIZE = 8;
+const CELL_SIZE = 38;
+const CELL_GAP = 2;
+
+// Channel zones
+const RHYTHM_CHANNELS = new Set([1, 2, 3, 8, 9, 10, 11]);
+const HARMONY_CHANNELS = new Set([16, 17, 18, 19, 24, 25, 26, 27, 32, 33]);
+const DYNAMICS_CHANNELS = new Set([34, 35, 40, 41, 42, 43, 48, 49, 50, 51, 57, 58]);
+const FEEDBACK_CHANNEL = 59;
+const PITCH_CHANNELS = new Set([4, 5, 6, 12, 13, 14, 20, 21, 28, 29, 36, 37]);
+const VELOCITY_CHANNELS = new Set([44, 45, 46, 47, 52, 53, 54, 55, 30, 31, 38]);
+const TIMING_CHANNELS = new Set([39, 60, 61, 62, 22, 15, 23]);
+const REF_CHANNELS = new Set([0, 7, 56, 63]);
+
+// ── State ──
+let spikeActivity = new Float32Array(64);
+let stimActivity = new Float32Array(64);
+let pianoRollHistory = [];
+let coherenceHistory = [];
+const MAX_PIANO_HISTORY = 128;
+const MAX_COHERENCE_HISTORY = 200;
+const DECAY = 0.92;
+let startTime = Date.now();
+
+// ── Web Audio Synthesizer ──
+let audioCtx = null;
+let audioEnabled = false;
+let audioMuted = false;
+let masterGain = null;
+let reverbNode = null;
+let compressor = null;
+
+const BASE_FREQ = [
+  261.63, 277.18, 293.66, 311.13, 329.63, 349.23,
+  369.99, 392.00, 415.30, 440.00, 466.16, 493.88
+];
+
+function initAudio() {
+  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  masterGain = audioCtx.createGain();
+  masterGain.gain.value = 0.3;
+
+  compressor = audioCtx.createDynamicsCompressor();
+  compressor.threshold.value = -20;
+  compressor.knee.value = 10;
+  compressor.ratio.value = 4;
+  compressor.attack.value = 0.005;
+  compressor.release.value = 0.1;
+
+  reverbNode = createReverb(audioCtx, 1.5, 2.0);
+
+  masterGain.connect(compressor);
+  reverbNode.connect(compressor);
+  compressor.connect(audioCtx.destination);
+  audioEnabled = true;
+}
+
+function createReverb(ctx, duration, decay) {
+  const length = ctx.sampleRate * duration;
+  const impulse = ctx.createBuffer(2, length, ctx.sampleRate);
+  for (let ch = 0; ch < 2; ch++) {
+    const data = impulse.getChannelData(ch);
+    for (let i = 0; i < length; i++)
+      data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / length, decay);
+  }
+  const convolver = ctx.createConvolver();
+  convolver.buffer = impulse;
+  return convolver;
+}
+
+function playNote(pitchClass, velocity, coherence) {
+  if (!audioEnabled || audioMuted || !audioCtx || velocity <= 0) return;
+  const now = audioCtx.currentTime;
+  const freq = BASE_FREQ[pitchClass];
+  const vel = velocity / 127;
+  const dur = 0.15 + coherence * 0.15;
+
+  const osc1 = audioCtx.createOscillator();
+  osc1.type = 'sine'; osc1.frequency.value = freq;
+  const osc2 = audioCtx.createOscillator();
+  osc2.type = 'triangle'; osc2.frequency.value = freq; osc2.detune.value = 3;
+
+  const noteGain = audioCtx.createGain();
+  noteGain.gain.setValueAtTime(0, now);
+  noteGain.gain.linearRampToValueAtTime(vel * 0.4, now + 0.008);
+  noteGain.gain.linearRampToValueAtTime(vel * 0.25, now + 0.05);
+  noteGain.gain.setValueAtTime(vel * 0.25, now + dur - 0.04);
+  noteGain.gain.linearRampToValueAtTime(0, now + dur);
+
+  const m1 = audioCtx.createGain(); m1.gain.value = 0.6;
+  const m2 = audioCtx.createGain(); m2.gain.value = 0.4;
+  osc1.connect(m1); osc2.connect(m2);
+  m1.connect(noteGain); m2.connect(noteGain);
+  noteGain.connect(masterGain);
+
+  const reverbSend = audioCtx.createGain();
+  reverbSend.gain.value = 0.2 + coherence * 0.15;
+  noteGain.connect(reverbSend);
+  reverbSend.connect(reverbNode);
+
+  osc1.start(now); osc2.start(now);
+  osc1.stop(now + dur + 0.05); osc2.stop(now + dur + 0.05);
+}
+
+// ── UI Setup ──
+const overlay = document.getElementById('audio-overlay');
+const muteBtn = document.getElementById('mute-btn');
+const statusEl = document.getElementById('connection-status');
+
+overlay.addEventListener('click', () => { initAudio(); overlay.classList.add('hidden'); });
+muteBtn.addEventListener('click', () => {
+  audioMuted = !audioMuted;
+  muteBtn.classList.toggle('muted', audioMuted);
+  muteBtn.textContent = audioMuted ? '\u266D' : '\u266A';
+  if (masterGain) masterGain.gain.value = audioMuted ? 0 : 0.3;
+});
+
+// Beat dots
+const beatIndicator = document.getElementById('beat-indicator');
+for (let i = 0; i < 16; i++) {
+  const dot = document.createElement('div');
+  dot.className = 'beat-dot' + (i % 4 === 0 ? ' downbeat' : '');
+  beatIndicator.appendChild(dot);
+}
+
+// Canvas contexts
+const meaCtx = document.getElementById('mea-canvas').getContext('2d');
+const pianoCtx = document.getElementById('piano-canvas').getContext('2d');
+const cohCtx = document.getElementById('coherence-graph').getContext('2d');
+
+// ── WebSocket Connection ──
+let ws = null;
+let pendingMessage = null;
+let binaryHandler = null;
+
+let wsId = 0; // monotonic ID to prevent stale reconnects
+
+function disconnect() {
+  wsId++;
+  if (ws) {
+    ws.onclose = null;
+    ws.onerror = null;
+    ws.close();
+    ws = null;
+  }
+  pendingMessage = null;
+  binaryHandler = null;
+  statusEl.textContent = 'disconnected';
+  statusEl.className = 'disconnected';
+}
+
+function connect() {
+  disconnect(); // clean up any existing connection
+  const myId = wsId;
+  const url = `ws://${WS_HOST}:${WS_PORT}/_/ws/live_streaming`;
+  console.log('Connecting to', url);
+  statusEl.textContent = 'connecting...';
+  statusEl.className = 'disconnected';
+
+  ws = new WebSocket(url);
+  ws.binaryType = 'arraybuffer';
+
+  ws.onopen = () => {
+    if (myId !== wsId) return; // stale connection
+    console.log('Connected!');
+    statusEl.textContent = 'connected';
+    statusEl.className = 'connected';
+
+    // Subscribe to data streams
+    for (const name of ['cl_spikes', 'cl_stims', 'spike_ensemble']) {
+      ws.send(JSON.stringify({ action: 'subscribe', type: 'data_stream', name }));
+    }
+  };
+
+  ws.onmessage = (event) => {
+    if (myId !== wsId) return;
+    if (event.data instanceof ArrayBuffer) {
+      if (binaryHandler) {
+        const handler = binaryHandler;
+        binaryHandler = null;
+        try { handler(event.data); }
+        catch (e) { console.error('Binary handler error:', e); }
+      } else {
+        console.warn('Received binary with no handler');
+      }
+      return;
+    }
+
+    const msg = JSON.parse(event.data);
+    if (msg.status !== 'cl_spikes' && msg.status !== 'cl_stims') {
+      console.log('WS msg:', msg);
+    }
+
+    if (msg.status === 'new_data') {
+      pendingMessage = msg;
+      binaryHandler = handleDataStream;
+    } else if (msg.status === 'cl_spikes') {
+      pendingMessage = msg;
+      binaryHandler = handleSpikes;
+    } else if (msg.status === 'cl_stims') {
+      pendingMessage = msg;
+      binaryHandler = handleStims;
+    }
+  };
+
+  ws.onclose = () => {
+    if (myId !== wsId) return; // stale — another connect() already took over
+    statusEl.textContent = 'disconnected';
+    statusEl.className = 'disconnected';
+    ws = null;
+    if (simRunning) setTimeout(() => { if (myId === wsId) connect(); }, 2000);
+  };
+
+  ws.onerror = () => { if (ws) ws.close(); };
+}
+
+let simRunning = false;
+
+function handleDataStream(data) {
+  const msg = pendingMessage;
+  pendingMessage = null;
+  console.log('Data stream msg:', msg.data_stream, 'bytes:', data.byteLength);
+  if (msg.data_stream !== 'spike_ensemble') return;
+
+  try {
+    const decoded = msgpack.decode(data);
+    console.log('Decoded spike_ensemble:', decoded);
+    updateFromMusicStream(decoded);
+  } catch (e) {
+    console.error('msgpack decode error:', e, 'raw bytes:', new Uint8Array(data).slice(0, 50));
+  }
+}
+
+function handleSpikes(data) {
+  const msg = pendingMessage;
+  pendingMessage = null;
+
+  const dv = new DataView(data);
+  const count = msg.spike_count;
+  const chOffset = count * 8;
+
+  for (let i = 0; i < count; i++) {
+    const ch = dv.getUint8(chOffset + i);
+    spikeActivity[ch] = Math.min(spikeActivity[ch] + 0.4, 1.0);
+  }
+}
+
+function handleStims(data) {
+  const msg = pendingMessage;
+  pendingMessage = null;
+
+  const dv = new DataView(data);
+  const count = msg.stim_count;
+  const chOffset = count * 8;
+
+  for (let i = 0; i < count; i++) {
+    const ch = dv.getUint8(chOffset + i);
+    stimActivity[ch] = Math.min(stimActivity[ch] + 0.5, 1.0);
+  }
+}
+
+function updateFromMusicStream(data) {
+  if (!data) return;
+
+  const phase = data.phase || 'listening';
+  document.getElementById('phase-label').textContent = phase.replace('_', ' ').toUpperCase();
+  document.getElementById('app').className = `phase-${phase}`;
+
+  const elapsed = (Date.now() - startTime) / 1000;
+  document.getElementById('phase-timer').textContent =
+    `${Math.floor(elapsed / 60)}:${Math.floor(elapsed % 60).toString().padStart(2, '0')}`;
+
+  if (data.chord) document.getElementById('chord-label').textContent = data.chord;
+
+  const beat = data.beat || 0;
+  const dots = beatIndicator.children;
+  for (let i = 0; i < dots.length; i++) dots[i].classList.toggle('active', i === beat);
+
+  const coherence = data.coherence || 0;
+  document.getElementById('coherence-value').textContent = coherence.toFixed(3);
+  document.getElementById('coherence-bar').style.width = `${coherence * 100}%`;
+  document.getElementById('trend-value').textContent =
+    (data.trend >= 0 ? '+' : '') + (data.trend || 0).toFixed(4);
+  document.getElementById('notes-total').textContent = data.notes_total || 0;
+  document.getElementById('velocity-value').textContent = data.velocity || 0;
+
+  // Play audio
+  const notes = data.notes || [];
+  if (notes.length > 0) console.log('Playing notes:', notes, 'vel:', data.velocity, 'coh:', coherence);
+  for (const note of notes) playNote(note, data.velocity || 64, coherence);
+
+  pianoRollHistory.push({ notes, coherence, beat });
+  if (pianoRollHistory.length > MAX_PIANO_HISTORY) pianoRollHistory.shift();
+
+  coherenceHistory.push(coherence);
+  if (coherenceHistory.length > MAX_COHERENCE_HISTORY) coherenceHistory.shift();
+}
+
+// ── Rendering ──
+function render() {
+  drawMEA(); drawPianoRoll(); drawCoherenceGraph();
+  for (let i = 0; i < 64; i++) { spikeActivity[i] *= DECAY; stimActivity[i] *= DECAY; }
+  requestAnimationFrame(render);
+}
+
+function drawMEA() {
+  const c = meaCtx, cv = c.canvas;
+  c.fillStyle = '#0a0a0f'; c.fillRect(0, 0, cv.width, cv.height);
+  for (let row = 0; row < 8; row++) {
+    for (let col = 0; col < 8; col++) {
+      const ch = row * 8 + col;
+      const x = col * (CELL_SIZE + CELL_GAP) + CELL_GAP;
+      const y = row * (CELL_SIZE + CELL_GAP) + CELL_GAP;
+      c.fillStyle = REF_CHANNELS.has(ch) ? '#1a1a1a' : '#151520';
+      c.fillRect(x, y, CELL_SIZE, CELL_SIZE);
+      if (REF_CHANNELS.has(ch)) continue;
+      if (stimActivity[ch] > 0.01) { c.fillStyle = `rgba(68,136,255,${stimActivity[ch]*0.7})`; c.fillRect(x,y,CELL_SIZE,CELL_SIZE); }
+      if (spikeActivity[ch] > 0.01) { c.fillStyle = `rgba(255,136,68,${spikeActivity[ch]*0.8})`; c.fillRect(x,y,CELL_SIZE,CELL_SIZE); }
+      c.fillStyle = '#555'; c.font = '9px monospace'; c.textAlign = 'center';
+      let label = ch.toString();
+      if (RHYTHM_CHANNELS.has(ch)) label = 'R';
+      else if (HARMONY_CHANNELS.has(ch)) label = 'H';
+      else if (DYNAMICS_CHANNELS.has(ch)) label = 'D';
+      else if (ch === FEEDBACK_CHANNEL) label = 'F';
+      else if (PITCH_CHANNELS.has(ch)) label = 'P';
+      else if (VELOCITY_CHANNELS.has(ch)) label = 'V';
+      else if (TIMING_CHANNELS.has(ch)) label = 'T';
+      c.fillText(label, x + CELL_SIZE/2, y + CELL_SIZE/2 + 3);
+    }
+  }
+}
+
+function drawPianoRoll() {
+  const c = pianoCtx, w = c.canvas.width, h = c.canvas.height, noteH = h / 12;
+  c.fillStyle = '#0a0a0f'; c.fillRect(0, 0, w, h);
+  c.font = '10px monospace'; c.textAlign = 'right';
+  for (let i = 0; i < 12; i++) {
+    const y = i * noteH, isBlack = [1,3,6,8,10].includes(i);
+    c.fillStyle = isBlack ? '#0d0d14' : '#111118'; c.fillRect(30, y, w-30, noteH);
+    c.strokeStyle = '#1a1a2a'; c.beginPath(); c.moveTo(30, y); c.lineTo(w, y); c.stroke();
+    c.fillStyle = isBlack ? '#555' : '#777'; c.fillText(PITCH_NAMES[i], 26, y + noteH/2 + 3);
+  }
+  const colW = (w - 30) / MAX_PIANO_HISTORY;
+  for (let col = 0; col < pianoRollHistory.length; col++) {
+    const e = pianoRollHistory[col], x = 30 + col * colW;
+    if (e.beat % 4 === 0) { c.fillStyle = 'rgba(100,255,218,0.05)'; c.fillRect(x, 0, colW, h); }
+    for (const note of e.notes) {
+      const r = Math.floor(255*(1-e.coherence)), g = Math.floor(200*e.coherence), b = Math.floor(100*e.coherence);
+      c.fillStyle = `rgb(${r},${g},${b})`; c.fillRect(x+1, note*noteH+1, colW-1, noteH-2);
+    }
+  }
+}
+
+function drawCoherenceGraph() {
+  const c = cohCtx, w = c.canvas.width, h = c.canvas.height;
+  c.fillStyle = '#0a0a0f'; c.fillRect(0, 0, w, h);
+  if (coherenceHistory.length < 2) return;
+  c.strokeStyle = '#1a1a2a'; c.setLineDash([2,4]);
+  for (const v of [0.25, 0.5, 0.75]) { c.beginPath(); c.moveTo(0, h-v*h); c.lineTo(w, h-v*h); c.stroke(); }
+  c.setLineDash([]);
+  const stepX = w / MAX_COHERENCE_HISTORY;
+  c.beginPath(); c.strokeStyle = '#64ffda'; c.lineWidth = 1.5;
+  for (let i = 0; i < coherenceHistory.length; i++) {
+    const x = i*stepX, y = h - coherenceHistory[i]*h;
+    if (i === 0) c.moveTo(x, y); else c.lineTo(x, y);
+  }
+  c.stroke();
+  c.lineTo((coherenceHistory.length-1)*stepX, h); c.lineTo(0, h); c.closePath();
+  c.fillStyle = 'rgba(100,255,218,0.05)'; c.fill();
+  c.fillStyle = '#666'; c.font = '9px monospace'; c.textAlign = 'left'; c.fillText('coherence', 4, 12);
+}
+
+// ── Demo Simulation Engine ──
+const DEMO_CHORDS = [
+  { name: 'Cmaj', tones: [0, 4, 7] },
+  { name: 'Amin', tones: [9, 0, 4] },
+  { name: 'Fmaj', tones: [5, 9, 0] },
+  { name: 'Gmaj', tones: [7, 11, 2] },
+];
+const PITCH_CH_ARR = [4, 5, 6, 12, 13, 14, 20, 21, 28, 29, 36, 37];
+const RHYTHM_CH_ARR = [1, 2, 3, 8, 9, 10, 11];
+const HARMONY_CH_ARR = [16, 17, 18, 19, 24, 25, 26, 27, 32, 33];
+const DYNAMICS_CH_ARR = [34, 35, 40, 41, 42, 43, 48, 49, 50, 51, 57, 58];
+const VELOCITY_CH_ARR = [44, 45, 46, 47, 52, 53, 54, 55, 30, 31, 38];
+
+let demoInterval = null;
+let demoBeat = 0;
+let demoNotesTotal = 0;
+let demoCoherence = 0.45;
+let demoTrendAccum = 0;
+
+function demoGetPhase(elapsed) {
+  if (elapsed >= 300) return 'challenge';
+  if (elapsed >= 120) return 'jamming';
+  if (elapsed >= 30) return 'learning';
+  if (elapsed >= 5) return 'first_notes';
+  return 'listening';
+}
+
+function startDemo() {
+  demoBeat = 0;
+  demoNotesTotal = 0;
+  demoCoherence = 0.45;
+  demoTrendAccum = 0;
+  const bpm = parseInt(document.getElementById('param-bpm').value) || 120;
+  const duration = parseInt(document.getElementById('param-duration').value) || 120;
+  const tickMs = Math.round(60000 / (bpm * 4)); // ms per 16th-note subdivision
+
+  demoInterval = setInterval(() => {
+    const elapsed = (Date.now() - startTime) / 1000;
+    if (elapsed >= duration) { stopDemo(); setSimUI(false); return; }
+
+    const phase = demoGetPhase(elapsed);
+    const chordIdx = Math.floor(demoBeat / 16) % 4;
+    const chord = DEMO_CHORDS[chordIdx];
+    const barPos = demoBeat % 16;
+
+    let notes = [];
+    let velocity = 0;
+
+    if (phase !== 'listening') {
+      // Generate notes: ~55% chance per tick, more during jamming
+      const noteChance = phase === 'jamming' ? 0.65 : phase === 'learning' ? 0.6 : 0.5;
+      if (Math.random() < noteChance) {
+        const count = 1 + Math.floor(Math.random() * (Math.random() < 0.3 ? 3 : 2));
+        for (let i = 0; i < count; i++) {
+          // Bias toward chord tones increases with coherence
+          const chordBias = 0.3 + demoCoherence * 0.3;
+          let n;
+          if (Math.random() < chordBias) {
+            n = chord.tones[Math.floor(Math.random() * chord.tones.length)];
+          } else {
+            n = Math.floor(Math.random() * 12);
+          }
+          if (!notes.includes(n)) notes.push(n);
+        }
+        velocity = Math.floor(Math.random() * 13);
+      }
+
+      // Coherence: slow drift with harmonic feedback
+      const chordFit = notes.length > 0
+        ? notes.filter(n => chord.tones.includes(n)).length / notes.length
+        : 0.5;
+      const target = 0.35 + chordFit * 0.35;
+      // Slow upward drift during learning, slight noise
+      const phaseBias = phase === 'learning' ? 0.002 : phase === 'jamming' ? 0.001 : 0;
+      demoCoherence += (target - demoCoherence) * 0.08 + (Math.random() - 0.48) * 0.015 + phaseBias;
+      demoCoherence = Math.max(0.25, Math.min(0.75, demoCoherence));
+      demoTrendAccum = demoTrendAccum * 0.95 + (demoCoherence - 0.45) * 0.05;
+
+      if (notes.length > 0) demoNotesTotal += notes.length;
+    }
+
+    // Simulate MEA activity
+    // Stim on input channels
+    for (const ch of RHYTHM_CH_ARR) {
+      if (barPos % 4 === 0 || Math.random() < 0.2) stimActivity[ch] = Math.min(stimActivity[ch] + 0.5, 1.0);
+    }
+    if (Math.random() < 0.4) {
+      for (const ch of HARMONY_CH_ARR) {
+        if (Math.random() < 0.3) stimActivity[ch] = Math.min(stimActivity[ch] + 0.4, 1.0);
+      }
+    }
+    for (const ch of DYNAMICS_CH_ARR) {
+      if (Math.random() < 0.12) stimActivity[ch] = Math.min(stimActivity[ch] + 0.3, 1.0);
+    }
+    // Feedback channel pulses with coherence
+    stimActivity[59] = Math.min(stimActivity[59] + demoCoherence * 0.6, 1.0);
+
+    // Spikes on output channels for active notes
+    for (const n of notes) {
+      if (n < PITCH_CH_ARR.length) spikeActivity[PITCH_CH_ARR[n]] = Math.min(spikeActivity[PITCH_CH_ARR[n]] + 0.7, 1.0);
+    }
+    // Velocity channel noise
+    for (const ch of VELOCITY_CH_ARR) {
+      if (Math.random() < 0.08) spikeActivity[ch] = Math.min(spikeActivity[ch] + 0.3, 1.0);
+    }
+    // Random spike noise on pitch channels
+    for (const ch of PITCH_CH_ARR) {
+      if (Math.random() < 0.06) spikeActivity[ch] = Math.min(spikeActivity[ch] + 0.2, 1.0);
+    }
+
+    updateFromMusicStream({
+      beat: barPos,
+      chord: chord.name,
+      notes: notes,
+      velocity: velocity,
+      coherence: Math.round(demoCoherence * 1000) / 1000,
+      phase: phase,
+      notes_total: demoNotesTotal,
+      trend: Math.round(demoTrendAccum * 10000) / 10000,
+    });
+
+    demoBeat++;
+  }, tickMs);
+}
+
+function stopDemo() {
+  if (demoInterval) { clearInterval(demoInterval); demoInterval = null; }
+}
+
+// ── Simulation Control ──
+const API_BASE = SERVER_URL || window.location.origin;
+const startBtn = document.getElementById('start-btn');
+const stopBtn = document.getElementById('stop-btn');
+const simStatus = document.getElementById('sim-status');
+const paramInputs = document.querySelectorAll('#control-bar input');
+
+function setSimUI(running) {
+  const wasRunning = simRunning;
+  simRunning = running;
+  startBtn.disabled = running;
+  stopBtn.disabled = !running;
+  paramInputs.forEach(el => el.disabled = running);
+  simStatus.textContent = running ? (demoMode ? 'DEMO' : 'RUNNING') : 'STOPPED';
+  simStatus.className = running ? 'running' : 'stopped';
+  if (demoMode) {
+    if (!running && wasRunning) stopDemo();
+  } else {
+    // Clean up WebSocket when stopping
+    if (!running && wasRunning) disconnect();
+    // Start WebSocket connection when simulation begins (delay to let subprocess start WS server)
+    if (running && !wasRunning) setTimeout(connect, 1500);
+  }
+}
+
+function resetVisualization() {
+  pianoRollHistory = [];
+  coherenceHistory = [];
+  spikeActivity = new Float32Array(64);
+  stimActivity = new Float32Array(64);
+  startTime = Date.now();
+  document.getElementById('phase-label').textContent = 'LISTENING';
+  document.getElementById('phase-timer').textContent = '0:00';
+  document.getElementById('coherence-value').textContent = '0.500';
+  document.getElementById('notes-total').textContent = '0';
+}
+
+startBtn.addEventListener('click', async () => {
+  // Enable audio on first interaction (browser requires user gesture)
+  if (!audioEnabled) { initAudio(); overlay.classList.add('hidden'); }
+  resetVisualization();
+
+  if (demoMode) {
+    startDemo();
+    setSimUI(true);
+    statusEl.textContent = 'demo mode';
+    statusEl.className = 'connected';
+    return;
+  }
+
+  simStatus.textContent = 'STARTING...';
+  simStatus.className = 'starting';
+  startBtn.disabled = true;
+  try {
+    const res = await fetch(`${API_BASE}/api/start`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        bpm: parseInt(document.getElementById('param-bpm').value),
+        duration: parseInt(document.getElementById('param-duration').value),
+        threshold: parseInt(document.getElementById('param-threshold').value),
+      })
+    });
+    const data = await res.json();
+    if (data.ok) {
+      setSimUI(true);
+    } else {
+      setSimUI(false);
+      console.warn('Start failed:', data.message);
+    }
+  } catch (e) {
+    console.error('API error:', e);
+    setSimUI(false);
+  }
+});
+
+stopBtn.addEventListener('click', async () => {
+  if (!demoMode) {
+    try {
+      await fetch(`${API_BASE}/api/stop`, { method: 'POST' });
+    } catch (e) { console.error('Stop error:', e); }
+  }
+  setSimUI(false);
+  document.getElementById('phase-label').textContent = '';
+  document.getElementById('phase-timer').textContent = '';
+});
+
+// Poll simulation status (only in live mode)
+if (!demoMode) {
+  setInterval(async () => {
+    try {
+      const res = await fetch(`${API_BASE}/api/status`);
+      const data = await res.json();
+      setSimUI(data.running);
+    } catch (e) { /* server not available, ignore */ }
+  }, 2000);
+}
+
+// ── Start ──
+if (demoMode) {
+  statusEl.textContent = 'demo mode';
+  statusEl.className = 'connected';
+}
+requestAnimationFrame(render);
+</script>
+</body>
+</html>

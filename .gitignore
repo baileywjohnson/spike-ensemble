@@ -1,0 +1,27 @@
+# CL SDK (install separately)
+cl-sdk-main/
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+
+# Data / recordings
+*.h5
+data/
+
+# Environment
+.env
+
+# OS
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*~

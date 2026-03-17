@@ -1,0 +1,8 @@
+{
+  "name": "Spike Ensemble - Default",
+  "timeout_s": 660,
+  "bpm": 120,
+  "spike_threshold": 3,
+  "default_octave": 4,
+  "duration_seconds": 600
+}

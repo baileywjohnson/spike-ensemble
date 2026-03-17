@@ -1,0 +1,4 @@
+cl-sdk
+mido
+python-rtmidi
+numpy
