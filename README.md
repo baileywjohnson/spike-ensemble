@@ -1,6 +1,6 @@
 # Spike Ensemble
 
-A closed-loop system where living neurons on a [Cortical Labs CL1](https://corticallabs.com) MEA produce real-time generative music.
+A closed-loop system where living neurons on a [Cortical Labs CL1](https://corticallabs.com) MEA produce real-time generative music. Built on the [CL SDK](https://github.com/Cortical-Labs/cl-sdk).
 
 Musical context (rhythm, harmony, dynamics) is encoded as electrical stimulation. Neural spike output is decoded into notes. A coherence scoring system provides feedback to shape the neurons toward musicality over time.
 
